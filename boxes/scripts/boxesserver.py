@@ -75,7 +75,10 @@ class FileChecker(threading.Thread):
     def run(self) -> None:
         while not self._stopped:
             if not self.filesOK():
-                os.execl(sys.executable, 'python', __file__, *sys.argv[1:])
+                #os.execl(sys.executable, 'python', __file__, *sys.argv[1:])
+                print("Exiting")
+                import os
+                os._exit(1)
             time.sleep(1)
 
     def stop(self) -> None:
