@@ -39,6 +39,9 @@ except ImportError:
 
 import boxes.generators
 import boxes.svgmerge
+from boxes.lids import LidSettings
+from boxes.edges import FingerJointSettings
+from boxes import edges as edges_module
 
 import yaml
 
@@ -286,13 +289,14 @@ def _format_yaml_value(value) -> str:
         return f'"{str(value)}"'
 
 
-def generate_yaml_for_generator(cls, output_dir: str, format_type: str = "full") -> str | None:
+def generate_yaml_for_generator(cls, output_dir: str, format_type: str = "full", uncommented: bool = False) -> str | None:
     """Generate a YAML file for a single generator.
     
     Args:
         cls: Generator class
         output_dir: Output directory for the file
         format_type: One of "full", "simple" (just args), or "minimal" (key-value pairs)
+        uncommented: If True, output uncommented YAML; otherwise all lines are commented
     """
     gname = cls.__name__
 
@@ -325,35 +329,59 @@ def generate_yaml_for_generator(cls, output_dir: str, format_type: str = "full")
                     default_value = getattr(a, 'default', None)
                     args_dict[param_name] = default_value
 
+        # Helper function to comment a line unless it's already a comment or uncommented is True
+        def comment_line(line: str) -> str:
+            if uncommented or line.strip().startswith('#') or line.strip() == '':
+                return line
+            leading_spaces = len(line) - len(line.lstrip())
+            return ' ' * leading_spaces + '# ' + line.strip()
+
+        # Valid values for specific parameters
+        VALID_VALUES = {
+            "Lid_style": list(LidSettings.absolute_params["style"]),
+            "Lid_handle": list(LidSettings.absolute_params["handle"]),
+            "FingerJoint_style": list(FingerJointSettings.absolute_params["style"]),
+            "Edge_style": ["too many! Run box_cli list edges to see valid values!"],
+        }
+
+        def get_valid_values_comment(param_name: str) -> str | None:
+            """Return a comment with valid values for specific parameters."""
+            if param_name.endswith("_edge"):
+                param_name = "Edge_style"
+            values = VALID_VALUES.get(param_name)
+            if values:
+                return f"Valid values: {', '.join(values)}"
+            return None
+
         yaml_lines = []
         yaml_lines.append("# Generated YAML configuration for " + gname)
-        
+
         if format_type == "simple":
             # Simple format: just args section
             yaml_lines.append("# Simple format (args only)")
             yaml_lines.append("")
             yaml_lines.append("args:")
-            
+
             for param_name, default_value in sorted(args_dict.items()):
                 value_str = _format_yaml_value(default_value)
-                yaml_lines.append(f"  {param_name}: {value_str}")
-                
+                yaml_lines.append(comment_line(f"  {param_name}: {value_str}"))
+
         elif format_type == "minimal":
             # Minimal format: just key-value pairs
             yaml_lines.append("# Minimal format (key-value pairs)")
             yaml_lines.append("")
-            
+
             for param_name, default_value in sorted(args_dict.items()):
                 value_str = _format_yaml_value(default_value)
-                yaml_lines.append(f"{param_name}: {value_str}")
-                
+                yaml_lines.append(comment_line(f"{param_name}: {value_str}"))
+
         else:  # full format
             # Full format with Defaults and Boxes sections
             yaml_lines.append("# Full format with Defaults and Boxes sections")
             yaml_lines.append("# This file can be used with boxes_generator.py or the build command")
             yaml_lines.append("")
             yaml_lines.append("Defaults:")
-            yaml_lines.append("    reference: 0")
+            yaml_lines.append(comment_line("    reference: 0"))
             yaml_lines.append("")
             yaml_lines.append("Boxes:")
             yaml_lines.append("  - box_type: " + gname)
@@ -371,7 +399,7 @@ def generate_yaml_for_generator(cls, output_dir: str, format_type: str = "full")
                     continue
 
                 # Add group name as comment
-                yaml_lines.append(f"      ## {group.title}")
+                yaml_lines.append(f"      ### {group.title}")
 
                 # Process arguments in this group
                 group_args = []
@@ -399,9 +427,13 @@ def generate_yaml_for_generator(cls, output_dir: str, format_type: str = "full")
 
                 # Sort arguments within the group and add them
                 for param_name, value_str, help_text in sorted(group_args):
+                    # Add valid values comment for specific parameters
+                    valid_values = get_valid_values_comment(param_name)
                     if help_text:
-                        yaml_lines.append(f"      # {help_text}")
-                    yaml_lines.append(f"      {param_name}: {value_str}")
+                        yaml_lines.append(f"      ## {help_text}")
+                    if valid_values:
+                        yaml_lines.append(f"      ## {valid_values}")
+                    yaml_lines.append(comment_line(f"      {param_name}: {value_str}"))
 
                 # Add empty line after each group for readability
                 if group_args:
@@ -468,7 +500,7 @@ def cmd_parameters(args) -> None:
             elif getattr(args, 'minimal', False):
                 format_type = "minimal"
                 
-            filename = generate_yaml_for_generator(cls, output_dir, format_type)
+            filename = generate_yaml_for_generator(cls, output_dir, format_type, args.uncommented)
             if filename:
                 generated_files.append(filename)
                 logging.info(f"Created {format_type} config {filename}")
@@ -886,7 +918,6 @@ def cmd_list_edges(args) -> None:
     patterns = args.patterns if args.patterns else ["*"]
 
     import inspect
-    from boxes import edges as edges_module
 
     class ConsoleColors:
         BOLD = '\033[1m'
@@ -1004,6 +1035,8 @@ def main(argv: list[str] | None = None) -> None:
                               help="Output in simple format (args section only)")
     format_group.add_argument("--minimal", action="store_true", default=False,
                               help="Output in minimal format (key-value pairs only)")
+    parameters_parser.add_argument("--uncommented", action="store_true", default=False,
+                              help="Output uncommented YAML (default is commented)")
     parameters_parser.add_argument("generators", type=str, nargs="*",
                                       help="Generator names to create config for")
 
