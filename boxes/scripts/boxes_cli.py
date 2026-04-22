@@ -11,14 +11,9 @@ Global parameters:
 
 The commands are:
 
-    build [file_or_generator] [--parameters FILE] [generator_args] => create boxes from YAML config file or CLI arguments
-    list [subcommand] => list generators, groups, lids, or edges
-        list generators [patterns] => list all generators or those matching wildcards
-        list groups [patterns] [--only-groups] => list groups and their generators
-        list lids [patterns] => list lid styles and handle types
-        list edges [patterns] => list edge types
-    parameters [--dir directory] [--all] [--simple|--minimal] [generator ...] => creates YAML config files for every generator specified in the directory specified (default current dir), requires generator name(s) or --all flag. --simple outputs args only, --minimal outputs key-value pairs only
-    box_yaml yaml_file => create a box from a yaml file
+    build [file_or_generator] [--parameters FILE] [generator_args] => create boxes
+    list [subcommand] => list different types of information (grnerators, groups, lids, edges ...)
+    parameters [--dir directory] [--all] [--simple|--minimal] [generator ...] => creates parameter files with the default value for generators
     merge => merge multiple boxes into one
     examples [--dir directory] => generate examples in examples folder (default examples/)
 
