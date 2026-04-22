@@ -12,13 +12,12 @@ Global parameters:
 The commands are:
 
     build [file_or_generator] [--parameters FILE] [generator_args] => create boxes from YAML config file or CLI arguments
-    version => list the version of boxes.py
     list [subcommand] => list generators, groups, lids, or edges
         list generators [patterns] => list all generators or those matching wildcards
         list groups [patterns] [--only-groups] => list groups and their generators
         list lids [patterns] => list lid styles and handle types
         list edges [patterns] => list edge types
-    parameters [--dir directory] [--all] [--simple|--minimal] [generator ...] => creates YAML config files for every generator specified in the directory specified (default generator_yaml), requires generator name(s) or --all flag. --simple outputs args only, --minimal outputs key-value pairs only
+    parameters [--dir directory] [--all] [--simple|--minimal] [generator ...] => creates YAML config files for every generator specified in the directory specified (default current dir), requires generator name(s) or --all flag. --simple outputs args only, --minimal outputs key-value pairs only
     box_yaml yaml_file => create a box from a yaml file
     merge => merge multiple boxes into one
     examples [--dir directory] => generate examples in examples folder (default examples/)
@@ -165,7 +164,7 @@ def multi_generate(config_path : Path|str|TextIO, output_path : Path|str, output
                         box_args.remove(unknown_arg)
                 box.parseArgs(box_args)
             except ArgumentParserError:
-                print("Error parsing box args for box %s : %s", ii, box_cls_name)
+                logging.error("Error parsing box args for box %s : %s", ii, box_cls_name)
                 continue
 
             # handle __GENERATE__ which must be called after parseArgs
@@ -173,7 +172,7 @@ def multi_generate(config_path : Path|str|TextIO, output_path : Path|str, output
                 if hasattr(box, "generate_layout") and callable(box.generate_layout):
                     box.layout = box.generate_layout()
                 else:
-                    print("Error box %s : %s requires manual layout", ii, box_cls_name)
+                    logging.error("Error box %s : %s requires manual layout", ii, box_cls_name)
                     continue
 
             box.metadata["reproducible"] = True
@@ -203,7 +202,7 @@ def multi_generate(config_path : Path|str|TextIO, output_path : Path|str, output
             if box_settings.get("count") is not None:
                 for jj in range(int(box_settings.get("count"))):
                     output_file = os.path.join(output_path, f"{output_fname}_{jj}.{format}")
-                    print(f"Writing {output_file}")
+                    logging.info(f"Writing {output_file}")
                     with open(output_file, "wb") as ff:
                         ff.write(data.read())
                         data.seek(0)
@@ -211,7 +210,7 @@ def multi_generate(config_path : Path|str|TextIO, output_path : Path|str, output
 
             else:
                 output_file = os.path.join(output_path, f"{output_fname}.{format}")
-                print(f"Writing {output_file}")
+                logging.info(f"Writing {output_file}")
                 with open(output_file, "wb") as ff:
                     ff.write(data.read())
                 generated_files.append(output_file)
@@ -266,10 +265,6 @@ def generators_by_name() -> dict[str, type[boxes.Boxes]]:
         name.split('.')[-1].lower(): generator
         for name, generator in all_generators.items()
     }
-
-
-def print_version() -> None:
-    print("boxes does not use versioning.")
 
 
 def example_output_fname_formatter(box_type, name, box_idx, metadata, box_args):
@@ -425,7 +420,7 @@ def generate_yaml_for_generator(cls, output_dir: str, format_type: str = "full")
         return filename
 
     except Exception as e:
-        print(f"Error generating YAML for {gname}: {e}")
+        logging.error(f"Error generating YAML for {gname}: {e}")
         return None
 
 
@@ -453,7 +448,7 @@ def cmd_parameters(args) -> None:
                     found = True
                     break
             if not found:
-                print(f"Warning: Generator '{name}' not found")
+                logging.warning(f"Warning: Generator '{name}' not found")
 
     generated_files = []
     errors = {}
@@ -481,16 +476,21 @@ def cmd_parameters(args) -> None:
             filename = generate_yaml_for_generator(cls, output_dir, format_type)
             if filename:
                 generated_files.append(filename)
-                print(f"Created {format_type} config {filename}")
+                logging.info(f"Created {format_type} config {filename}")
         except Exception as e:
             errors[gname] = repr(e)
-            print(f"Error with {gname}: {e}")
+            logging.error(f"Error with {gname}: {e}")
 
-    print(f"\nCreated {len(generated_files)} config files in '{base_output_dir}' directory")
+    if base_output_dir == ".":
+        base_output_text = "current"
+    else:
+        base_output_text = f"'{base_output_dir}'"
+
+    logging.info(f"Created {len(generated_files)} config files in {base_output_text} directory")
     if errors:
-        print(f"Errors encountered: {len(errors)}")
+        logging.error(f"Errors encountered: {len(errors)}")
         for name, error in errors.items():
-            print(f"  {name}: {error}")
+            logging.error(f"  {name}: {error}")
 
 
 def cmd_box_yaml(args) -> None:
@@ -505,11 +505,11 @@ def cmd_examples(args) -> None:
     """Handle examples command"""
     if args.examples:
         config_files = [Path(__file__).parent.parent.parent / 'examples.yml']
-        print("Generating SVG examples from default config.")
+        logging.info("Generating SVG examples from default config.")
     else:
         config_files = [Path(c) for c in args.config]
         for config_path in config_files:
-            print(f"Generating SVG examples from {config_path}.")
+            logging.info(f"Generating SVG examples from {config_path}.")
     output_path = Path(args.dir)
     output_path.mkdir(parents=True, exist_ok=True)
     for config_path in config_files:
@@ -631,8 +631,8 @@ def cmd_build(args) -> None:
             else:
                 # Get just the class names for error message
                 simple_names = sorted(set(name.split('.')[-1] for name in all_generators.keys()))
-                print(f"Error: '{file_or_gen}' is not a file and not a valid generator name")
-                print(f"Valid generators: {', '.join(simple_names)}")
+                logging.error(f"Error: '{file_or_gen}' is not a file and not a valid generator name")
+                logging.error(f"Valid generators: {', '.join(simple_names)}")
                 return
     
     # Start with defaults if present
@@ -666,7 +666,7 @@ def cmd_build(args) -> None:
     
     # Check if we have any boxes to generate
     if not boxes_list:
-        print("Error: No box_type defined. Provide a config file with Boxes, or use --box_type")
+        logging.error("Error: No box_type defined. Provide a config file with Boxes, or use --box_type")
         return
     
     # Additional parameters from --parameters files
@@ -924,11 +924,6 @@ def cmd_list_edges(args) -> None:
         print(f"  No edges found matching patterns: {patterns}")
 
 
-def cmd_version(args) -> None:
-    """Handle version command"""
-    print_version()
-
-
 def main(argv: list[str] | None = None) -> None:
     # Create main parser
     parser = argparse.ArgumentParser(
@@ -982,9 +977,6 @@ def main(argv: list[str] | None = None) -> None:
     build_parser.add_argument("generator_args", nargs=argparse.REMAINDER,
                             help="Generator parameters to override (e.g., --output=mybox.svg --thickness=4.0)")
 
-    # version command
-    subparsers.add_parser("version", help="Show version information")
-
     # list command with subcommands
     list_parser = subparsers.add_parser("list", help="List generators, groups, lids, or edges")
     list_subparsers = list_parser.add_subparsers(dest="list_command", help="List subcommands")
@@ -1008,8 +1000,8 @@ def main(argv: list[str] | None = None) -> None:
 
     # parameters command
     parameters_parser = subparsers.add_parser("parameters", help="Generate YAML configuration files for generators")
-    parameters_parser.add_argument("--dir", type=str, default="generator_yaml",
-                                      help="Output directory for YAML files (default: generator_yaml)")
+    parameters_parser.add_argument("--dir", type=str, default=".",
+                                      help="Output directory for YAML files (default: current dir)")
     parameters_parser.add_argument("--all", action="store_true", default=False,
                                       help="Create config files for all generators")
     format_group = parameters_parser.add_mutually_exclusive_group()
@@ -1054,8 +1046,6 @@ def main(argv: list[str] | None = None) -> None:
     # Route to the appropriate command handler
     if args.command == "build":
         cmd_build(args)
-    elif args.command == "version":
-        cmd_version(args)
     elif args.command == "list":
         cmd_list(args)
     elif args.command == "parameters":
