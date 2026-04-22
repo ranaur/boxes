@@ -1,0 +1,7 @@
+#!/bin/bash
+
+SCRIPT=boxes_proxy.py
+
+SCRIPT_DIR="$(dirname ${BASH_SOURCE[0]})"
+
+"$SCRIPT_DIR/../boxes/scripts/$SCRIPT" "$@"
