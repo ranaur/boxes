@@ -11,7 +11,7 @@ Global parameters:
 
 The commands are:
 
-    build [file_or_generator] [--box_type TYPE] [--parameters FILE] [generator_args] => create boxes from YAML config file or CLI arguments
+    build [file_or_generator] [--parameters FILE] [generator_args] => create boxes from YAML config file or CLI arguments
     version => list the version of boxes.py
     list [subcommand] => list generators, groups, lids, or edges
         list generators [patterns] => list all generators or those matching wildcards
@@ -601,7 +601,7 @@ def cmd_build(args) -> None:
     """Handle build command - generate boxes from YAML configuration file or CLI arguments.
     
     Accepts a Full format YAML file with Defaults and Boxes sections, or
-    a generator name / --box_type argument to specify the generator directly.
+    a generator name as positional argument to specify the generator directly.
     Each box is generated with accumulated parameters.
     Additional --parameters files and CLI arguments can be specified
     to override or add to the configuration.
@@ -611,7 +611,7 @@ def cmd_build(args) -> None:
     
     # Determine if positional argument is a file or generator name
     main_config = {}
-    cli_box_type = args.box_type  # Start with explicit --box_type if provided
+    cli_box_type = None
     
     if args.file_or_generator:
         file_or_gen = args.file_or_generator
@@ -967,10 +967,8 @@ def main(argv: list[str] | None = None) -> None:
                     "Examples:\n"
                     "  boxes_cli build ABox --thickness=5.0 --output=box.svg\n"
                     "  boxes_cli build config.yaml\n"
-                    "  boxes_cli build config.yaml --parameters=overrides.yaml\n"
-                    "  boxes_cli build --box_type=ABox --thickness=5.0 --output=custom.svg\n\n"
+                    "  boxes_cli build config.yaml --parameters=overrides.yaml\n\n"
                     "Common CLI overrides:\n"
-                    "  --box_type TYPE       Generator type (e.g., ABox, UniversalBox)\n"
                     "  --output FILE         Name of the output file\n"
                     "  --format FORMAT       Output format (svg, pdf, ps, etc.)\n"
                     "  --thickness MM        Material thickness in mm\n"
@@ -979,8 +977,6 @@ def main(argv: list[str] | None = None) -> None:
                     "  --parameters FILE     Additional YAML file(s) with parameters")
     build_parser.add_argument("file_or_generator", type=str, nargs="?", default=None,
                               help="YAML config file (if exists) or generator name (e.g., ABox, UniversalBox)")
-    build_parser.add_argument("--box_type", type=str, default=None,
-                              help="Generator type to build (alternative to positional argument)")
     build_parser.add_argument("--parameters", type=str, nargs="*",
                               help="Additional YAML file(s) with parameters to use (can be specified multiple times)")
     build_parser.add_argument("generator_args", nargs=argparse.REMAINDER,
