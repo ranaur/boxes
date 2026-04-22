@@ -88,58 +88,76 @@ def generate_yaml_for_generator(cls, output_dir):
         yaml_lines.append("# Generated YAML configuration for " + gname)
         yaml_lines.append("# This file can be used with boxes_generator.py")
         yaml_lines.append("")
+        yaml_lines.append("Defaults:")
+        yaml_lines.append("    reference: 0")
+        yaml_lines.append("")
         yaml_lines.append("Boxes:")
         yaml_lines.append("  - box_type: " + gname)
         yaml_lines.append("    name: \"" + gname + "_example\"")
         yaml_lines.append("    generate: true")
         yaml_lines.append("    args:")
         
-        # Add parameters with comments
-        for param_name, default_value in sorted(args_dict.items()):
-            help_text = ""
+        # Add parameters grouped by argument groups
+        # Use the same group ordering as the server version
+        for group in b.argparser._action_groups[3:] + b.argparser._action_groups[:3]:
+            if not group._group_actions:
+                continue
+            if len(group._group_actions) == 1 and isinstance(group._group_actions[0], argparse._HelpAction):
+                continue
+            if group.title in ['optional arguments', 'options']:
+                continue
             
-            # Find the help text for this parameter
-            for grp in b.argparser._action_groups:
-                if grp.title in ['optional arguments', 'options']:
+            # Add group name as comment
+            yaml_lines.append(f"      # {group.title}")
+            
+            # Process arguments in this group
+            group_args = []
+            for a in group._group_actions:
+                if isinstance(a, argparse._HelpAction):
                     continue
-                for a in grp._group_actions:
-                    if isinstance(a, argparse._HelpAction):
-                        continue
-                    
-                    # Check if this action matches our parameter
-                    param_match = False
-                    for flag in getattr(a, 'option_strings', []):
-                        if flag.startswith('--') and flag[2:] == param_name:
-                            param_match = True
-                            break
-                        elif flag.startswith('-') and not flag.startswith('--') and flag[1:] == param_name:
-                            param_match = True
-                            break
-                    
-                    if param_match:
-                        help_text = getattr(a, 'help', '')
+                if a.dest in ("input", "output"):
+                    continue
+                
+                # Get parameter name (remove leading dashes)
+                param_name = None
+                for flag in getattr(a, 'option_strings', []):
+                    if flag.startswith('--'):
+                        param_name = flag[2:]
                         break
+                    elif flag.startswith('-') and not flag.startswith('--'):
+                        param_name = flag[1:]
+                        break
+                
+                if param_name and param_name != 'help':
+                    # Get default value and help text
+                    default_value = getattr(a, 'default', None)
+                    help_text = getattr(a, 'help', '')
+                    
+                    # Format the value for YAML
+                    if default_value is None:
+                        value_str = "null"
+                    elif isinstance(default_value, bool):
+                        value_str = str(default_value).lower()
+                    elif isinstance(default_value, str):
+                        value_str = f"\"{default_value}\""
+                    elif isinstance(default_value, (int, float)):
+                        value_str = str(default_value)
+                    elif isinstance(default_value, list):
+                        value_str = str(default_value)
+                    else:
+                        value_str = f"\"{str(default_value)}\""
+                    
+                    group_args.append((param_name, value_str, help_text))
+            
+            # Sort arguments within the group and add them
+            for param_name, value_str, help_text in sorted(group_args):
                 if help_text:
-                    break
+                    yaml_lines.append(f"      # {help_text}")
+                yaml_lines.append(f"      {param_name}: {value_str}")
             
-            # Format the value for YAML
-            if default_value is None:
-                value_str = "null"
-            elif isinstance(default_value, bool):
-                value_str = str(default_value).lower()
-            elif isinstance(default_value, str):
-                value_str = f"\"{default_value}\""
-            elif isinstance(default_value, (int, float)):
-                value_str = str(default_value)
-            elif isinstance(default_value, list):
-                value_str = str(default_value)
-            else:
-                value_str = f"\"{str(default_value)}\""
-            
-            # Add parameter with help comment
-            if help_text:
-                yaml_lines.append(f"      # {help_text}")
-            yaml_lines.append(f"      {param_name}: {value_str}")
+            # Add empty line after each group for readability
+            if group_args:
+                yaml_lines.append("")
         
         # Write to file
         filename = os.path.join(output_dir, f"{gname.lower()}.yaml")
