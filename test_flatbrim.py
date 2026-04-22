@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 
-from boxes import Box
+from boxes import Boxes
 
-class TestFlatBrim(Box):
+class TestFlatBrim(Boxes):
     """Simple test box to verify flatbrim lid generation"""
     ui_group = "Box"
 
@@ -20,5 +20,5 @@ class TestFlatBrim(Box):
 
 if __name__ == "__main__":
     t = TestFlatBrim()
-    t.parseArgs(["--lid_style", "flatbrim"])
+    t.parseArgs(["--Lid_style", "flatbrim"])
     t.render()
