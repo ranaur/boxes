@@ -1,0 +1,117 @@
+# Generated YAML configuration for WallPliersHolder
+# Full format with Defaults and Boxes sections
+# This file can be used with boxes_generator.py or the build command
+
+Defaults:
+    # reference: 0
+
+Boxes:
+  - box_type: WallPliersHolder
+    name: "WallPliersHolder_example"
+    generate: true
+    args:
+      ### Settings for Finger Joints
+      ## height of the bottom lips sticking out  (multiples of thickness) FingerHoleEdge only!
+      # FingerJoint_bottom_lip: 0.0
+      ## space below holes of FingerHoleEdge (multiples of thickness)
+      # FingerJoint_edge_width: 1.0
+      ## extra material to grind away burn marks (multiples of thickness)
+      # FingerJoint_extra_length: 0.0
+      ## width of the fingers (multiples of thickness)
+      # FingerJoint_finger: 2.0
+      ## extra space to allow finger move in and out (multiples of thickness)
+      # FingerJoint_play: 0.0
+      ## space between fingers (multiples of thickness)
+      # FingerJoint_space: 2.0
+      ## style of the fingers
+      ## Valid values: rectangular, springs, barbs, snap
+      # FingerJoint_style: "rectangular"
+      ## space at the start and end in multiple of normal spaces
+      # FingerJoint_surroundingspaces: 2.0
+      ## width of finger holes (multiples of thickness)
+      # FingerJoint_width: 1.0
+
+      ### Settings for plain WallEdges
+      ## space below holes of FingerHoleEdge (multiples of thickness)
+      # Wall_edge_width: 1.0
+
+      ### Settings for SlatWallEdges
+      ## "spring", "stud" or "none"
+      # SlatWall_bottom_hook: "hook"
+      ## space below holes of FingerHoleEdge (multiples of thickness)
+      # SlatWall_edge_width: 1.0
+      ## horizontal width of the hook
+      # SlatWall_hook_depth: 4.0
+      ## horizontal space to the hook
+      # SlatWall_hook_distance: 5.5
+      ## space surrounding connectors (multiples of thickness)
+      # SlatWall_hook_extra_height: 2.0
+      ## height of the horizontal bar of the hook
+      # SlatWall_hook_height: 6.0
+      ## height of the hook top to bottom
+      # SlatWall_hook_overall_height: 12.0
+      ## vertical spacing of slots middle to middle (in mm)
+      # SlatWall_pitch: 101.6
+
+      ### Settings for DinRailEdges
+      ## "stud" or "none"
+      # DinRail_bottom: "stud"
+      ## horizontal width of the hook
+      # DinRail_depth: 8.0
+      ## space below holes of FingerHoleEdge (multiples of thickness)
+      # DinRail_edge_width: 1.0
+
+      ### Settings for FrenchCleatEdges
+      ## angle of the cut (0 for horizontal)
+      # FrenchCleat_angle: 45.0
+      ## "stud" to brace against the wall, "hook" for attaching to a second cleat or "none" for just straight
+      # FrenchCleat_bottom: "stud"
+      ## horizontal width of the hook in mm
+      # FrenchCleat_depth: 18.0
+      ## space below holes of FingerHoleEdge (multiples of thickness)
+      # FrenchCleat_edge_width: 1.0
+      ## distance of the cleats in mm (for bottom hook)
+      # FrenchCleat_spacing: 200.0
+
+      ### Settings for SkadisEdges
+      ## Thickness of the Skandis board
+      # Skadis_board_thickness: 5.1
+      # Skadis_edge_width: 1.0
+      ## How to hook into the wall
+      # Skadis_style: "hooks"
+
+      ### WallPliersHolder Settings
+      ## bracing angle - less for more bracing
+      # angle: 45
+      ## inner height in mm (unless outside selected)
+      # h: 50
+      ## treat sizes as outside measurements [🛈](https://florianfesti.github.io/boxes/html/usermanual.html#outside)
+      # outside: true
+      ## sections left to right in mm [🛈](https://florianfesti.github.io/boxes/html/usermanual.html#section-parameters)
+      # sx: "100*3"
+      ## Type of wall system to attach to
+      # walltype: "plain"
+      ## inner depth in mm (unless outside selected)
+      # y: 50
+
+      ### Default Settings
+      ## burn correction (in mm)(bigger values for tighter fit) [🛈](https://florianfesti.github.io/boxes/html/usermanual.html#burn)
+      # burn: 0.1
+      ## print surrounding boxes for some structures [🛈](https://florianfesti.github.io/boxes/html/usermanual.html#debug)
+      # debug: false
+      ## format of resulting file [🛈](https://florianfesti.github.io/boxes/html/usermanual.html#format)
+      # format: "svg"
+      ## style for inner corners [🛈](https://florianfesti.github.io/boxes/html/usermanual.html#inner-corners)
+      # inner_corners: "loop"
+      ## label the parts (where available)
+      # labels: true
+      ## Add a QR Code with link or command line to the generated output
+      # qr_code: false
+      ## print reference rectangle with given length (in mm)(zero to disable) [🛈](https://florianfesti.github.io/boxes/html/usermanual.html#reference)
+      # reference: 100.0
+      ## spacing around parts (multiples of thickness [: extra space in mm]) [🛈](https://florianfesti.github.io/boxes/html/usermanual.html#spacing)
+      # spacing: "0.5"
+      ## width of tabs holding the parts in place (in mm)(not supported everywhere) [🛈](https://florianfesti.github.io/boxes/html/usermanual.html#tabs)
+      # tabs: 0.0
+      ## thickness of the material (in mm) [🛈](https://florianfesti.github.io/boxes/html/usermanual.html#thickness)
+      # thickness: 3.0

@@ -520,14 +520,6 @@ def cmd_parameters(args) -> None:
             logging.error(f"  {name}: {error}")
 
 
-def cmd_box_yaml(args) -> None:
-    """Handle box_yaml command"""
-    yaml_file = args.yaml_file
-    output_path = Path(args.output_dir) if args.output_dir else Path(".")
-    output_fname_format = "{name}_{box_idx}"
-    multi_generate(yaml_file, output_path, output_fname_format)
-
-
 def cmd_examples(args) -> None:
     """Handle examples command"""
     if args.examples:
@@ -720,15 +712,18 @@ def cmd_build(args) -> None:
     for box_data in boxes_list:
         box_idx += 1
         # Start with defaults
-        current_params = dict(defaults)
+        current_params = dict(defaults) if defaults is not None else {}
         
         # Add box-specific settings
         if "box_type" in box_data:
             current_params["box_type"] = box_data["box_type"]
         if "args" in box_data:
-            for key, value in box_data["args"].items():
-                if value is not None:
-                    current_params[key] = value
+            args = box_data.get("args", {})
+            if args:
+                if args.items():
+                    for key, value in args.items():
+                        if value is not None:
+                            current_params[key] = value
         # Copy other keys (name, generate, etc.)
         for key in ["name", "generate"]:
             if key in box_data:
@@ -767,27 +762,27 @@ def cmd_build(args) -> None:
         
         # Generate the box
         logging.info(f"Creating box: {box_type} (name: {box_name})")
-        _generate_box(current_params, args.verbose, args.debug)
+        _generate_box(current_params)
         logging.info(f"Finished creating box: {box_name}")
     
     logging.info(f"Build complete. Generated {box_idx} box(es).")
 
 
-def _generate_box(params: dict[str, any], verbose: bool, debug: bool) -> None:
+def _generate_box(params: dict[str, any]) -> None:
     """Generate a single box with the given parameters."""
     box_type = params.pop("box_type")
-    
+
+    # Use name for output filename if output is not specified
+    name = params.pop("name", None)
+    if name and "output" not in params:
+        params["output"] = f"{name}.svg"
+
     # Convert params to command line format
     extra = []
     for key, value in params.items():
         if value is not None:
             extra.append(f"--{key}={value}")
-    
-    if verbose:
-        logging.getLogger().setLevel(logging.INFO)
-    if debug:
-        logging.getLogger().setLevel(logging.DEBUG)
-    
+
     run_generator(box_type, extra)
 
 
@@ -1080,8 +1075,6 @@ def main(argv: list[str] | None = None) -> None:
         if not args.all and not args.generators:
             parameters_parser.error("Either provide generator name(s) or use --all flag")
         cmd_parameters(args)
-    elif args.command == "box_yaml":
-        cmd_box_yaml(args)
     elif args.command == "merge":
         cmd_merge(args)
     elif args.command == "examples":

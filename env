@@ -1,0 +1,8 @@
+#!/bin/bash
+SCRIPT_DIR="$(dirname ${BASH_SOURCE[0]})"
+SCRIPT_DIR="$(realpath -f "$SCRIPT_DIR")"
+source venv-wsl/bin/activate
+
+export PATH="$SCRIPT_DIR/scripts":"$SCRIPT_DIR/boxes/scripts":$PATH
+
+bash

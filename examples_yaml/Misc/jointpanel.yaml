@@ -1,0 +1,51 @@
+# Generated YAML configuration for JointPanel
+# Full format with Defaults and Boxes sections
+# This file can be used with boxes_generator.py or the build command
+
+Defaults:
+    # reference: 0
+
+Boxes:
+  - box_type: JointPanel
+    name: "JointPanel_example"
+    generate: true
+    args:
+      ### Settings for Dove Tail Joints
+      ## how much should fingers widen (-80 to 80)
+      # DoveTail_angle: 50
+      ## how far the dove tails stick out of/into the edge (multiples of thickness)
+      # DoveTail_depth: 0.5
+      ## radius used on all four corners (multiples of thickness)
+      # DoveTail_radius: 0.1
+      ## from one middle of a dove tail to another (multiples of thickness)
+      # DoveTail_size: 1
+
+      ### JointPanel Settings
+      ## draw pieces apart so they can be cut to form a large sheet
+      # separate: false
+      ## sections left to right in mm [🛈](https://florianfesti.github.io/boxes/html/usermanual.html#section-parameters)
+      # sx: "400/2"
+      ## sections back to front in mm [🛈](https://florianfesti.github.io/boxes/html/usermanual.html#section-parameters)
+      # sy: "400/3"
+
+      ### Default Settings
+      ## burn correction (in mm)(bigger values for tighter fit) [🛈](https://florianfesti.github.io/boxes/html/usermanual.html#burn)
+      # burn: 0.1
+      ## print surrounding boxes for some structures [🛈](https://florianfesti.github.io/boxes/html/usermanual.html#debug)
+      # debug: false
+      ## format of resulting file [🛈](https://florianfesti.github.io/boxes/html/usermanual.html#format)
+      # format: "svg"
+      ## style for inner corners [🛈](https://florianfesti.github.io/boxes/html/usermanual.html#inner-corners)
+      # inner_corners: "loop"
+      ## label the parts (where available)
+      # labels: true
+      ## Add a QR Code with link or command line to the generated output
+      # qr_code: false
+      ## print reference rectangle with given length (in mm)(zero to disable) [🛈](https://florianfesti.github.io/boxes/html/usermanual.html#reference)
+      # reference: 100.0
+      ## spacing around parts (multiples of thickness [: extra space in mm]) [🛈](https://florianfesti.github.io/boxes/html/usermanual.html#spacing)
+      # spacing: "0.5"
+      ## width of tabs holding the parts in place (in mm)(not supported everywhere) [🛈](https://florianfesti.github.io/boxes/html/usermanual.html#tabs)
+      # tabs: 0.0
+      ## thickness of the material (in mm) [🛈](https://florianfesti.github.io/boxes/html/usermanual.html#thickness)
+      # thickness: 3.0
