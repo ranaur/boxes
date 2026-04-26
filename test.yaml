@@ -1,0 +1,10 @@
+# multi.yaml
+Boxes:
+  - box_type: ABox
+    args:
+      thickness: 4.0
+      output: box1.svg
+  - box_type: UniversalBox  # Triggers ABox generation, then continues with UniversalBox
+    args:
+      thickness: 5.0
+      output: box2.svg

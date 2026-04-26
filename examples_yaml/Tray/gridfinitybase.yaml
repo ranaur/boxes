@@ -1,0 +1,123 @@
+# Generated YAML configuration for GridfinityBase
+# Full format with Defaults and Boxes sections
+# This file can be used with boxes_generator.py or the build command
+
+Defaults:
+    # reference: 0
+
+Boxes:
+  - box_type: GridfinityBase
+    name: "GridfinityBase_example"
+    generate: true
+    args:
+      ### Settings for Dove Tail Joints
+      ## how much should fingers widen (-80 to 80)
+      # DoveTail_angle: 40
+      ## how far the dove tails stick out of/into the edge (multiples of thickness)
+      # DoveTail_depth: 0.3
+      ## radius used on all four corners (multiples of thickness)
+      # DoveTail_radius: 0.05
+      ## from one middle of a dove tail to another (multiples of thickness)
+      # DoveTail_size: 3
+
+      ### Settings for Finger Joints
+      ## height of the bottom lips sticking out  (multiples of thickness) FingerHoleEdge only!
+      # FingerJoint_bottom_lip: 0.0
+      ## space below holes of FingerHoleEdge (multiples of thickness)
+      # FingerJoint_edge_width: 1.0
+      ## extra material to grind away burn marks (multiples of thickness)
+      # FingerJoint_extra_length: 0.0
+      ## width of the fingers (multiples of thickness)
+      # FingerJoint_finger: 4.0
+      ## extra space to allow finger move in and out (multiples of thickness)
+      # FingerJoint_play: 0.0
+      ## space between fingers (multiples of thickness)
+      # FingerJoint_space: 4.0
+      ## style of the fingers
+      ## Valid values: rectangular, springs, barbs, snap
+      # FingerJoint_style: "rectangular"
+      ## space at the start and end in multiple of normal spaces
+      # FingerJoint_surroundingspaces: 2.0
+      ## width of finger holes (multiples of thickness)
+      # FingerJoint_width: 1.0
+
+      ### Settings for the Lid
+      ## height of the brim in multiple of thickness (for flatbrim lids)
+      # Lid_brim_height: 1.0
+      ## space between the brim and the walls (for flatbrim lids)
+      # Lid_brim_spacing: 0.15
+      ## size of the fangs in multiples of thickness (for fangbrim lids)
+      # Lid_fang_size: 1.0
+      ## type of handle
+      ## Valid values: none, long_rounded, long_trapezoid, long_doublerounded, knob
+      # Lid_handle: "none"
+      ## height of the handle in multiples of thickness (if applicable)
+      # Lid_handle_height: 8.0
+      ## height of the brim in multiples of thickness (if any)
+      # Lid_height: 4.0
+      ## play when sliding the lid on in multiples of thickness (if applicable)
+      # Lid_play: 0.1
+      ## type of lid to create
+      ## Valid values: none, flat, chest, overthetop, ontop, flatbrim, fangbrim
+      # Lid_style: "none"
+
+      ### GridfinityBase Settings
+      # base_type: "standard"
+      ## edge type for bottom edge
+      ## Valid values: too many! Run box_cli list edges to see valid values!
+      # bottom_edge: "F"
+      ## cut pads to be used for gridinity boxes from the grid openings
+      # cut_pads: false
+      ## if pads are cut add holes for magnets. Typical is 6.5, zero to disable,
+      # cut_pads_mag_diameter: 6.5
+      ## if magnet hole offset from pitch corners.  Typical is 7.75.
+      # cut_pads_mag_offset: 7.75
+      ## height of sidewalls of the tray (mm)
+      # h: 21
+      ## Extra margin around the gridfinity base to allow it to drop into the carrier (mm)
+      # m: 0.5
+      ## The cutout for each grid opening.  Typical is 38.
+      # opening: 38
+      ## The corner radius for each grid opening.  Typical is 0.8,
+      # pad_radius: 0.8
+      ## edge type for sub panels
+      ## Valid values: too many! Run box_cli list edges to see valid values!
+      # panel_edge: "D"
+      ## the maximum sized panel that can be cut in x direction
+      # panel_x: 0
+      ## the maximum sized panel that can be cut in y direction
+      # panel_y: 0
+      ## The Gridfinity pitch, in mm.  Should always be 42.
+      # pitch: 42
+      ## The corner radius for each grid opening.  Typical is 1.6.
+      # radius: 1.6
+      ## size of base in X direction (0=auto)
+      # size_x: 0
+      ## size of base in Y direction (0=auto)
+      # size_y: 0
+      ## number of grids in X direction (0=auto)
+      # x: 3
+      ## number of grids in Y direction (0=auto)
+      # y: 2
+
+      ### Default Settings
+      ## burn correction (in mm)(bigger values for tighter fit) [🛈](https://florianfesti.github.io/boxes/html/usermanual.html#burn)
+      # burn: 0.1
+      ## print surrounding boxes for some structures [🛈](https://florianfesti.github.io/boxes/html/usermanual.html#debug)
+      # debug: false
+      ## format of resulting file [🛈](https://florianfesti.github.io/boxes/html/usermanual.html#format)
+      # format: "svg"
+      ## style for inner corners [🛈](https://florianfesti.github.io/boxes/html/usermanual.html#inner-corners)
+      # inner_corners: "loop"
+      ## label the parts (where available)
+      # labels: true
+      ## Add a QR Code with link or command line to the generated output
+      # qr_code: false
+      ## print reference rectangle with given length (in mm)(zero to disable) [🛈](https://florianfesti.github.io/boxes/html/usermanual.html#reference)
+      # reference: 100.0
+      ## spacing around parts (multiples of thickness [: extra space in mm]) [🛈](https://florianfesti.github.io/boxes/html/usermanual.html#spacing)
+      # spacing: "0.5"
+      ## width of tabs holding the parts in place (in mm)(not supported everywhere) [🛈](https://florianfesti.github.io/boxes/html/usermanual.html#tabs)
+      # tabs: 0.0
+      ## thickness of the material (in mm) [🛈](https://florianfesti.github.io/boxes/html/usermanual.html#thickness)
+      # thickness: 3.0
