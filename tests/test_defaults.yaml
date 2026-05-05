@@ -1,0 +1,40 @@
+# Exported current parameters for ABox
+# Values same as defaults are commented
+
+box_type: ABox
+name: "abox_example"
+generate: true
+args:
+  # FingerJoint_bottom_lip: 0.0
+  # FingerJoint_edge_width: 1.0
+  # FingerJoint_extra_length: 0.0
+  # FingerJoint_finger: 2.0
+  # FingerJoint_play: 0.0
+  # FingerJoint_space: 2.0
+  # FingerJoint_style: rectangular
+  # FingerJoint_surroundingspaces: 2.0
+  # FingerJoint_width: 1.0
+  # Lid_brim_height: 1.0
+  # Lid_brim_spacing: 0.15
+  # Lid_fang_size: 1.0
+  # Lid_handle: none
+  # Lid_handle_height: 8.0
+  # Lid_height: 4.0
+  # Lid_play: 0.1
+  # Lid_style: none
+  # bottom_edge: h
+  # burn: 0.1
+  # debug: false
+  # format: svg
+  # h: 100.0
+  # inner_corners: loop
+  # labels: true
+  # output: box.svg
+  # outside: true
+  # qr_code: false
+  # reference: 100.0
+  spacing: (0.5, 0.0)
+  # tabs: 0.0
+  # thickness: 3.0
+  # x: 100.0
+  # y: 100.0
