@@ -615,7 +615,6 @@ def parse_arg_to_tuple(arg: str) -> tuple[str, any]:
     
     return key, value
 
-
 def cmd_build(args) -> None:
     """Handle build command - generate boxes from YAML configuration file or CLI arguments.
     
@@ -706,6 +705,48 @@ def cmd_build(args) -> None:
             cli_params.append(parse_arg_to_tuple(arg))
         if args.verbose and cli_params:
             logging.info(f"Loaded {len(cli_params)} parameter(s) from command line")
+    
+    # Handle export functionality
+    if args.export:
+        if not cli_box_type:
+            logging.error("Error: --export requires a generator name (e.g., boxes_cli build ABox --export params.yaml)")
+            return
+        
+        # Create box instance and parse arguments to get current values
+        all_generators = getAllBoxGenerators()
+        generator_map = {name.split('.')[-1].lower(): name for name in all_generators.keys()}
+        
+        if cli_box_type.lower() not in generator_map:
+            logging.error(f"Error: Generator '{cli_box_type}' not found")
+            return
+            
+        full_generator_name = generator_map[cli_box_type.lower()]
+        generator_class = all_generators[full_generator_name]
+        
+        # Create box instance and parse arguments
+        box = generator_class()
+        box.translations = get_translation()
+        
+        # Parse CLI arguments to get current values (excluding --export)
+        export_args = []
+        for arg in cli_params:
+            if isinstance(arg, str) and not arg.startswith('--export='):
+                export_args.append(arg)
+            elif isinstance(arg, tuple):
+                # Convert tuple to list and filter
+                arg_list = list(arg)
+                filtered_args = [a for a in arg_list if not (isinstance(a, str) and a.startswith('--export='))]
+                if filtered_args:
+                    export_args.append(tuple(filtered_args))
+        if export_args:
+            box.parseArgs(export_args)
+        else:
+            box.parseArgs([])
+
+        with open(args.export, "wb") as f:
+            f.write(box.generateYAML())
+        logging.info(f"Exported current parameters to {args.export}")
+        return
     
     # Generate each box
     box_idx = 0
@@ -983,20 +1024,25 @@ def main(argv: list[str] | None = None) -> None:
                     "Examples:\n"
                     "  boxes_cli build ABox --thickness=5.0 --output=box.svg\n"
                     "  boxes_cli build config.yaml\n"
-                    "  boxes_cli build config.yaml --parameters=overrides.yaml\n\n"
+                    "  boxes_cli build config.yaml --parameters=overrides.yaml\n"
+                    "  boxes_cli build ABox --export params.yaml\n"
+                    "  boxes_cli build ABox --thickness=5.0 --export params.yaml\n\n"
                     "Common CLI overrides:\n"
                     "  --output FILE         Name of the output file\n"
                     "  --format FORMAT       Output format (svg, pdf, ps, etc.)\n"
                     "  --thickness MM        Material thickness in mm\n"
                     "  --burn MM             Burn correction in mm\n"
                     "  --labels BOOL         Label the parts\n"
-                    "  --parameters FILE     Additional YAML file(s) with parameters")
+                    "  --parameters FILE     Additional YAML file(s) with parameters\n"
+                    "  --export FILE        Export current parameters to YAML file (values same as defaults are commented)")
     build_parser.add_argument("file_or_generator", type=str, nargs="?", default=None,
                               help="YAML config file (if exists) or generator name (e.g., ABox, UniversalBox)")
     build_parser.add_argument("--parameters", type=str, nargs="*",
                               help="Additional YAML file(s) with parameters to use (can be specified multiple times)")
     build_parser.add_argument("generator_args", nargs=argparse.REMAINDER,
                             help="Generator parameters to override (e.g., --output=mybox.svg --thickness=4.0)")
+    build_parser.add_argument("--export", type=str, default=None,
+                            help="Export current parameters to YAML file (values same as defaults are commented)")
 
     # list command with subcommands
     list_parser = subparsers.add_parser("list", help="List generators, groups, lids, or edges")
