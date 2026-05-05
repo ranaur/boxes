@@ -355,6 +355,7 @@ class Boxes:
         self.argparser = ArgumentParser(description=description)
         self.edgesettings: dict[Any, Any] = {}
         self.non_default_args: dict[Any, Any] = {}
+        self.original_args: dict[Any, Any] = {}  # Store original user input values
         self.translations = gettext.NullTranslations()
 
         short_description: str = ""
@@ -410,7 +411,11 @@ class Boxes:
             help="name of resulting file")
         def spacing_type(x):
             try:
-                return (float(x), 0.)
+                values = [float(v.strip()) for v in x.split(":")]
+                # Pad with zeros if fewer than 2 values
+                while len(values) < 2:
+                    values.append(0.0)
+                return tuple(values[:2])  # Return first 2 values
             except ValueError:
                 return tuple(float(v.strip()) for v in x.split(":"))
         defaultgroup.add_argument(
@@ -622,8 +627,14 @@ class Boxes:
         self.metadata["cli"] = "boxes " + self.__class__.__name__ + " " + " ".join(cliQuote(arg) for arg in args)
         self.metadata["cli"] = self.metadata["cli"].strip()
 
-        for key, value in vars(self.argparser.parse_args(args=args)).items():
+        # Parse arguments and store original user input values
+        parsed_args = vars(self.argparser.parse_args(args=args))
+        
+        for key, value in parsed_args.items():
             default = self.argparser.get_default(key)
+
+            # Store original user input values for export functionality
+            self.original_args[key] = value
 
             # treat edge settings separately
             for setting in self.edgesettings:
@@ -641,6 +652,137 @@ class Boxes:
 
         self.metadata["cli_short"] = "boxes " + self.__class__.__name__ + " " + " ".join(cliQuote(arg) for arg in args if (arg.split("=")[0][2:] in self.non_default_args))
         self.metadata["cli_short"] = self.metadata["cli_short"].strip()
+
+    def getDefaultArgs(self):
+        """
+        Return all default arguments for this class as a dictionary.
+        
+        Inspects the argparser and returns a dictionary in the format 
+        [ui_group_]parameter_name = default value
+        
+        :returns: Dictionary of all default arguments
+        :rtype: dict
+        """
+        defaults = {}
+        
+        # Get class name for box_type
+        defaults["box_type"] = self.__class__.__name__
+        defaults["name"] = self.__class__.__name__.lower() + "_example"
+        defaults["generate"] = "true"
+        
+        # Iterate through all argument groups
+        for group in self.argparser._action_groups:
+            # Skip the positional arguments group (usually the first one)
+            if group.title == "positional arguments":
+                continue
+                
+            # Iterate through all actions (arguments) in this group
+            for action in group._actions:
+                # Skip the help action
+                if action.dest == "help":
+                    continue
+                    
+                # Get the argument name (remove -- prefix)
+                arg_name = action.dest
+                
+                # Get the default value
+                default_value = action.default
+                
+                # The argument name should already include the prefix if there is one
+                # So we use it as-is
+                key = arg_name
+                    
+                # Convert the current value to string for consistency
+                print(f"action.type = {action.type}")
+                if isinstance(action.type, BoolArg):
+                    defaults[key] = default_value
+                else:
+                    defaults[key] = action.type(default_value)
+        
+        return defaults
+
+    def getOriginalArgs(self):
+        """
+        Return all current arguments for this class as a dictionary.
+        
+        Returns the actual current values of parameters (after parseArgs) 
+        in the format [ui_group_]parameter_name = current value
+        
+        :returns: Dictionary of all current arguments
+        :rtype: dict
+        """
+        current = {}
+        
+        # Get class name for box_type
+        current["box_type"] = self.__class__.__name__
+        current["name"] = getattr(self, 'name', self.__class__.__name__.lower() + "_example")
+        current["generate"] = getattr(self, 'generate', 'true')
+        
+        # Iterate through all argument groups
+        for group in self.argparser._action_groups:
+            # Skip the positional arguments group (usually the first one)
+            if group.title == "positional arguments":
+                continue
+                
+            # Iterate through all actions (arguments) in this group
+            for action in group._actions:
+                # Skip the help action
+                if action.dest == "help":
+                    continue
+                    
+                # Get the argument name
+                arg_name = action.dest
+                
+                # Get the current value - use original user input for dimension and spacing parameters
+                # that get modified by the 'outside' parameter
+                current_value = self.original_args.get(arg_name, action.default)
+
+                # The argument name should already include the prefix if there is one
+                # So we use it as-is
+                key = arg_name
+                    
+                # Convert the current value to string for consistency
+                current[key] = current_value
+        
+        return current
+
+    def generateYAML(self):
+        # Get current and default parameters
+        current_params = self.getOriginalArgs()
+        default_params = self.getDefaultArgs()
+
+        # Generate YAML content
+        yaml_lines = []
+        yaml_lines.append(f"# Exported current parameters for {current_params.get('box_type', 'Unknown')}")
+        yaml_lines.append("# Values same as defaults are commented")
+        yaml_lines.append("")
+        yaml_lines.append("box_type: " + current_params.get("box_type", "Unknown"))
+        yaml_lines.append("name: \"" + current_params.get("name", "example") + "\"")
+        yaml_lines.append("generate: " + current_params.get("generate", "true"))
+        yaml_lines.append("args:")
+
+        def format_value(value):
+            if isinstance(value, bool):
+                return str(value).lower()
+            if isinstance(value, tuple):
+                return ":".join(str(v) for v in value)
+            return str(value)
+        
+        # Sort parameters for consistent output
+        for key in sorted(current_params.keys()):
+            if key in ["box_type", "name", "generate"]:
+                continue  # Already handled above
+            value = current_params[key]
+            default = default_params.get(key, None)
+
+            # Comment if value is same as default
+            if value == default:
+                yaml_lines.append(f"  # {key}: {format_value(value)}")
+            else:
+                yaml_lines.append(f"  {key}: {format_value(value)}")
+
+        yaml_content = "\n".join(yaml_lines)
+        return yaml_content.encode("utf-8")
 
     def addPart(self, part, name=None):
         """
