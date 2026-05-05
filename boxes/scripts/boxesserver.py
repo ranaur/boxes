@@ -295,6 +295,7 @@ class BServer:
     <button name="render" value="2" formtarget="_self">{_("Download")}</button>
     <button name="render" value="0" formtarget="_self">{_("Save to URL")}</button>
     <button name="render" value="3" formtarget="_blank">{_("QR Code")}</button>
+    <button name="render" value="5" formtarget="_blank">{_("YAML")}</button>
 </p>
 </form>
 </div>
@@ -720,6 +721,14 @@ class BServer:
             start_response(status, http_headers)
             qrcode = get_qrcode(box.metadata["url_short"], qr_format)
             return (qrcode,)
+
+        if render == "5":
+            # YAML export
+            http_headers = [('Content-type', 'text/x-yaml; charset=utf-8')]
+            http_headers.append(('Content-Disposition', f'attachment; filename="{box.__class__.__name__}.yaml"'))
+            http_headers.append(('X-Robots-Tag', 'noindex,nofollow'))
+            start_response(status, http_headers)
+            return [box.generateYAML()]
 
         if box.format != "svg" or render == "2":
             extension = box.format
