@@ -32,6 +32,7 @@ from typing import Any
 from xml.sax.saxutils import quoteattr
 
 import qrcode
+import yaml
 from shapely.geometry import *
 from shapely.ops import split
 
@@ -783,6 +784,106 @@ class Boxes:
 
         yaml_content = "\n".join(yaml_lines)
         return yaml_content.encode("utf-8")
+
+    @staticmethod
+    def fromYAML(filename: str, translations=None):
+        with open(filename, "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+
+        if not isinstance(data, dict):
+            raise ValueError("YAML content must be a mapping")
+
+        defaults = data.get("Defaults", {})
+        boxes_data = data.get("Boxes", None)
+
+        # Backward compatible: accept the single-box export format
+        if boxes_data is None and "box_type" in data:
+            boxes_data = [
+                {
+                    "box_type": data.get("box_type"),
+                    "name": data.get("name", None),
+                    "generate": data.get("generate", None),
+                    "args": data.get("args", {}),
+                }
+            ]
+            defaults = {}
+
+        if defaults is None:
+            defaults = {}
+        if not isinstance(defaults, dict):
+            raise ValueError("'Defaults' must be a mapping")
+
+        defaults_args = defaults
+        if "args" in defaults:
+            if defaults["args"] is None:
+                defaults_args = {}
+            elif isinstance(defaults["args"], dict):
+                defaults_args = defaults["args"]
+            else:
+                raise ValueError("'Defaults.args' must be a mapping")
+        if not isinstance(boxes_data, list):
+            raise ValueError("'Boxes' must be a list")
+
+        from boxes.generators import getAllBoxGenerators
+
+        all_generators = getAllBoxGenerators()
+        generator_map = {name.split('.')[-1].lower(): name for name in all_generators.keys()}
+
+        def _format_cli_value(value):
+            if isinstance(value, bool):
+                return "true" if value else "false"
+            if isinstance(value, (int, float, str)):
+                return str(value)
+            if value is None:
+                return None
+            return str(value)
+
+        result = []
+        for entry in boxes_data:
+            if not isinstance(entry, dict):
+                raise ValueError("Each item in 'Boxes' must be a mapping")
+
+            box_type = entry.get("box_type", None)
+            if not box_type or not isinstance(box_type, str):
+                raise ValueError("Each box must contain a 'box_type' string")
+
+            key = box_type.split(".")[-1].lower()
+            if key not in generator_map:
+                raise ValueError(f"Generator '{box_type}' not found")
+
+            generator_class = all_generators[generator_map[key]]
+            box = generator_class()
+            if translations is not None:
+                box.translations = translations
+
+            args_data = entry.get("args", {})
+            if args_data is None:
+                args_data = {}
+            if not isinstance(args_data, dict):
+                raise ValueError("'args' must be a mapping")
+
+            merged = dict(defaults_args)
+            merged.update(args_data)
+
+            cli_args = []
+            for k, v in merged.items():
+                if v is None:
+                    continue
+                cli_v = _format_cli_value(v)
+                if cli_v is None:
+                    continue
+                cli_args.append(f"--{k}={cli_v}")
+
+            box.parseArgs(cli_args)
+
+            if "name" in entry and entry.get("name") is not None:
+                box.name = entry.get("name")
+            if "generate" in entry and entry.get("generate") is not None:
+                box.generate = entry.get("generate")
+
+            result.append(box)
+
+        return result
 
     def addPart(self, part, name=None):
         """

@@ -31,6 +31,56 @@ import fnmatch
 from pathlib import Path
 from typing import TextIO
 
+
+class _CliColorFormatter(logging.Formatter):
+    def __init__(self, *, use_colors: bool) -> None:
+        super().__init__()
+        self._use_colors = use_colors
+
+    def format(self, record: logging.LogRecord) -> str:
+        msg = record.getMessage()
+
+        if record.levelno >= logging.ERROR:
+            prefix = "ERROR: "
+            color = "\033[31m"
+        elif record.levelno >= logging.WARNING:
+            prefix = "WARNING! "
+            color = "\033[33m"
+        elif record.levelno >= logging.INFO:
+            prefix = ""
+            color = ""
+        else:
+            prefix = "DEBUG: "
+            color = "\033[2m"
+
+        if record.exc_info:
+            msg = f"{prefix}{msg}\n{self.formatException(record.exc_info)}"
+        else:
+            msg = f"{prefix}{msg}"
+
+        if self._use_colors and color:
+            return f"{color}{msg}\033[0m"
+        return msg
+
+
+def _configure_cli_logging(*, debug: bool, verbose: bool) -> None:
+    root = logging.getLogger()
+    root.handlers.clear()
+
+    if debug:
+        level = logging.DEBUG
+    elif verbose:
+        level = logging.INFO
+    else:
+        level = logging.WARNING
+
+    root.setLevel(level)
+
+    handler = logging.StreamHandler(stream=sys.stderr)
+    handler.setLevel(level)
+    handler.setFormatter(_CliColorFormatter(use_colors=bool(getattr(sys.stderr, "isatty", lambda: False)())))
+    root.addHandler(handler)
+
 try:
     import boxes
 except ImportError:
@@ -832,6 +882,41 @@ def wildcard_match(pattern: str, text: str) -> bool:
     return fnmatch.fnmatch(text.lower(), pattern.lower())
 
 
+def cmd_generate(args) -> None:
+    box_list = boxes.Boxes.fromYAML(args.yaml_file, translations=get_translation())
+
+    logging.info(f"Loaded {len(box_list)} box{"(es)" if len(box_list) != 1 else ""} from YAML file {args.yaml_file}")
+
+    if args.output and len(box_list) != 1:
+        raise ValueError("--output can only be used when the YAML results in exactly one box")
+
+    for idx, box in enumerate(box_list, start=1):
+        if args.output:
+            box.output = args.output
+        else:
+            yaml_has_output = "output" in getattr(box, "non_default_args", {})
+            if not yaml_has_output:
+                fmt = getattr(box, "format", "svg")
+                extension = fmt
+                if extension == "svg_Ponoko":
+                    extension = "svg"
+                yaml_path = Path(args.yaml_file)
+                if len(box_list) > 1:
+                    box.output = str(yaml_path.with_name(f"{yaml_path.stem} - {idx}.{extension}"))
+                else:
+                    box.output = str(yaml_path.with_suffix("." + extension))
+
+        logging.info(f"Generating {box.__class__.__name__} to {box.output}")
+
+        box.metadata["reproducible"] = True
+        box.open()
+        box.render()
+        data = box.close()
+
+        with os.fdopen(sys.stdout.fileno(), "wb", closefd=False) if box.output == "-" else open(box.output, 'wb') as f:
+            f.write(data.getvalue())
+
+
 def cmd_list(args) -> None:
     """Handle list command with subcommands"""
     if args.list_command == "generators":
@@ -1087,6 +1172,14 @@ def main(argv: list[str] | None = None) -> None:
     box_yaml_parser.add_argument("--output-dir", type=str, default=".",
                                  help="Output directory (default: current directory)")
 
+    # generate command - create a single box from an exported YAML file
+    generate_parser = subparsers.add_parser("generate",
+        help="Generate a box from an exported YAML file",
+        description="Generate a single box from a YAML file exported by the web server or 'boxes_cli build ... --export'.")
+    generate_parser.add_argument("yaml_file", type=str, help="YAML file exported from a generator")
+    generate_parser.add_argument("--output", type=str, default=None,
+        help="Output file path (default: same name as YAML file with extension matching the box format)")
+
     # merge command
     merge_parser = subparsers.add_parser("merge", help="Merge multiple SVG files")
     merge_parser.add_argument("merge_args", nargs=argparse.REMAINDER,
@@ -1105,30 +1198,35 @@ def main(argv: list[str] | None = None) -> None:
     args = parser.parse_args(argv)
 
     # Set up logging based on global flags
-    if args.debug:
-        logging.getLogger().setLevel(logging.DEBUG)
-    elif args.verbose:
-        logging.getLogger().setLevel(logging.INFO)
-    else:
-        logging.basicConfig(level=logging.WARNING)
+    _configure_cli_logging(debug=bool(args.debug), verbose=bool(args.verbose))
 
-    # Route to the appropriate command handler
-    if args.command == "build":
-        cmd_build(args)
-    elif args.command == "list":
-        cmd_list(args)
-    elif args.command == "parameters":
-        if not args.all and not args.generators:
-            parameters_parser.error("Either provide generator name(s) or use --all flag")
-        cmd_parameters(args)
-    elif args.command == "merge":
-        cmd_merge(args)
-    elif args.command == "examples":
-        if not args.examples and not args.config:
-            examples_parser.error("Either provide config file(s) or use --examples flag")
-        cmd_examples(args)
-    else:
-        parser.print_help()
+    try:
+        if args.command == "build":
+            cmd_build(args)
+        elif args.command == "list":
+            cmd_list(args)
+        elif args.command == "parameters":
+            if not args.all and not args.generators:
+                parameters_parser.error("Either provide generator name(s) or use --all flag")
+            cmd_parameters(args)
+        elif args.command == "merge":
+            cmd_merge(args)
+        elif args.command == "examples":
+            if not args.examples and not args.config:
+                examples_parser.error("Either provide config file(s) or use --examples flag")
+            cmd_examples(args)
+        elif args.command == "generate":
+            cmd_generate(args)
+        else:
+            parser.print_help()
+    except KeyboardInterrupt:
+        logging.error("Interrupted")
+        raise SystemExit(130)
+    except SystemExit:
+        raise
+    except Exception as exc:
+        logging.error("%s", exc, exc_info=bool(args.debug))
+        raise SystemExit(1)
 
 if __name__ == '__main__':
     import sys
