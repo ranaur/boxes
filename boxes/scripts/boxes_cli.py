@@ -719,7 +719,7 @@ def cmd_build(args) -> None:
     boxes_list = []
     if isinstance(main_config, dict) and "Boxes" in main_config and main_config["Boxes"]:
         boxes_list = main_config["Boxes"]
-        logging.info(f"Found {len(boxes_list)} box(es) in config file")
+        logging.info(f"Found {len(boxes_list)} box{"es" if len(boxes_list) != 1 else ""} in config file")
     
     # If box_type is provided via CLI, add it as a box (or override first box)
     if cli_box_type:
@@ -856,7 +856,7 @@ def cmd_build(args) -> None:
         _generate_box(current_params)
         logging.info(f"Finished creating box: {box_name}")
     
-    logging.info(f"Build complete. Generated {box_idx} box(es).")
+    logging.info(f"Build complete. Generated {box_idx} box{"es" if box_idx != 1 else ""}.")
 
 
 def _generate_box(params: dict[str, any]) -> None:
@@ -883,38 +883,60 @@ def wildcard_match(pattern: str, text: str) -> bool:
 
 
 def cmd_generate(args) -> None:
-    box_list = boxes.Boxes.fromYAML(args.yaml_file, translations=get_translation())
+    yaml_files = list(getattr(args, "yaml_files", []) or [])
+    if not yaml_files and getattr(args, "yaml_file", None):
+        yaml_files = [args.yaml_file]
 
-    logging.info(f"Loaded {len(box_list)} box{"(es)" if len(box_list) != 1 else ""} from YAML file {args.yaml_file}")
+    defaults: dict = {}
 
-    if args.output and len(box_list) != 1:
+    counts: list[tuple[str, int]] = []
+    for path in yaml_files:
+        box_list, _ = boxes.Boxes.fromYAMLFile(path, translations=get_translation(), defaults=defaults)
+        counts.append((path, len(box_list)))
+
+    total_boxes = sum(c for _, c in counts)
+    if args.output and total_boxes != 1:
         raise ValueError("--output can only be used when the YAML results in exactly one box")
 
-    for idx, box in enumerate(box_list, start=1):
-        if args.output:
-            box.output = args.output
-        else:
-            yaml_has_output = "output" in getattr(box, "non_default_args", {})
-            if not yaml_has_output:
-                fmt = getattr(box, "format", "svg")
-                extension = fmt
-                if extension == "svg_Ponoko":
-                    extension = "svg"
-                yaml_path = Path(args.yaml_file)
-                if len(box_list) > 1:
-                    box.output = str(yaml_path.with_name(f"{yaml_path.stem} - {idx}.{extension}"))
-                else:
-                    box.output = str(yaml_path.with_suffix("." + extension))
+    global_idx = 0
+    for path, file_box_count in counts:
+        prev_defaults = dict(defaults)
+        box_list, defaults = boxes.Boxes.fromYAMLFile(path, translations=get_translation(), defaults=defaults)
+        defaults_loaded = defaults != prev_defaults
 
-        logging.info(f"Generating {box.__class__.__name__} to {box.output}")
+        if file_box_count > 0:
+            plural = "es" if file_box_count != 1 else ""
+            suffix = " (defaults loaded)" if defaults_loaded else ""
+            logging.info(f"Loaded {file_box_count} box{plural} from YAML file {path}{suffix}")
+        elif defaults_loaded:
+            logging.info(f"Loaded defaults from YAML file {path}")
 
-        box.metadata["reproducible"] = True
-        box.open()
-        box.render()
-        data = box.close()
+        for idx, box in enumerate(box_list, start=1):
+            global_idx += 1
+            if args.output:
+                box.output = args.output
+            else:
+                yaml_has_output = "output" in getattr(box, "non_default_args", {})
+                if not yaml_has_output:
+                    fmt = getattr(box, "format", "svg")
+                    extension = fmt
+                    if extension == "svg_Ponoko":
+                        extension = "svg"
+                    yaml_path = Path(path)
+                    if total_boxes > 1:
+                        box.output = str(yaml_path.with_name(f"{yaml_path.stem}-{global_idx}.{extension}"))
+                    else:
+                        box.output = str(yaml_path.with_suffix("." + extension))
 
-        with os.fdopen(sys.stdout.fileno(), "wb", closefd=False) if box.output == "-" else open(box.output, 'wb') as f:
-            f.write(data.getvalue())
+            logging.info(f"Generating {box.__class__.__name__} to {box.output}")
+
+            box.metadata["reproducible"] = True
+            box.open()
+            box.render()
+            data = box.close()
+
+            with os.fdopen(sys.stdout.fileno(), "wb", closefd=False) if box.output == "-" else open(box.output, 'wb') as f:
+                f.write(data.getvalue())
 
 
 def cmd_list(args) -> None:
@@ -1176,7 +1198,7 @@ def main(argv: list[str] | None = None) -> None:
     generate_parser = subparsers.add_parser("generate",
         help="Generate a box from an exported YAML file",
         description="Generate a single box from a YAML file exported by the web server or 'boxes_cli build ... --export'.")
-    generate_parser.add_argument("yaml_file", type=str, help="YAML file exported from a generator")
+    generate_parser.add_argument("yaml_files", type=str, nargs="+", help="YAML file(s) exported from a generator")
     generate_parser.add_argument("--output", type=str, default=None,
         help="Output file path (default: same name as YAML file with extension matching the box format)")
 
