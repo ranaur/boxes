@@ -628,14 +628,18 @@ class Boxes:
         self.metadata["cli"] = "boxes " + self.__class__.__name__ + " " + " ".join(cliQuote(arg) for arg in args)
         self.metadata["cli"] = self.metadata["cli"].strip()
 
+        for arg in args:
+            key, value= arg.split("=")
+            if key.startswith("--"):
+                key = key[2:]
+            # Store original user input values for export functionality
+            self.original_args[key] = value
+
         # Parse arguments and store original user input values
         parsed_args = vars(self.argparser.parse_args(args=args))
         
         for key, value in parsed_args.items():
             default = self.argparser.get_default(key)
-
-            # Store original user input values for export functionality
-            self.original_args[key] = value
 
             # treat edge settings separately
             for setting in self.edgesettings:
@@ -787,13 +791,22 @@ class Boxes:
 
     @staticmethod
     def fromYAML(filename: str, translations=None):
+        box_list, _ = Boxes.fromYAMLFile(filename, translations=translations, defaults={})
+        return box_list
+
+    @staticmethod
+    def fromYAMLFile(filename: str, translations=None, defaults: dict | None = None):
         with open(filename, "r", encoding="utf-8") as f:
             data = yaml.safe_load(f)
 
         if not isinstance(data, dict):
             raise ValueError("YAML content must be a mapping")
 
-        defaults = data.get("Defaults", {})
+        input_defaults = defaults or {}
+        if not isinstance(input_defaults, dict):
+            raise ValueError("'defaults' must be a mapping")
+
+        file_defaults = data.get("Defaults", {})
         boxes_data = data.get("Boxes", None)
 
         # Backward compatible: accept the single-box export format
@@ -806,23 +819,29 @@ class Boxes:
                     "args": data.get("args", {}),
                 }
             ]
-            defaults = {}
+            file_defaults = {}
 
-        if defaults is None:
-            defaults = {}
-        if not isinstance(defaults, dict):
+        if boxes_data is None:
+            boxes_data = []
+
+        if file_defaults is None:
+            file_defaults = {}
+        if not isinstance(file_defaults, dict):
             raise ValueError("'Defaults' must be a mapping")
 
-        defaults_args = defaults
-        if "args" in defaults:
-            if defaults["args"] is None:
+        defaults_args = file_defaults
+        if "args" in file_defaults:
+            if file_defaults["args"] is None:
                 defaults_args = {}
-            elif isinstance(defaults["args"], dict):
-                defaults_args = defaults["args"]
+            elif isinstance(file_defaults["args"], dict):
+                defaults_args = file_defaults["args"]
             else:
                 raise ValueError("'Defaults.args' must be a mapping")
         if not isinstance(boxes_data, list):
             raise ValueError("'Boxes' must be a list")
+
+        updated_defaults = dict(input_defaults)
+        updated_defaults.update(defaults_args)
 
         from boxes.generators import getAllBoxGenerators
 
@@ -862,7 +881,7 @@ class Boxes:
             if not isinstance(args_data, dict):
                 raise ValueError("'args' must be a mapping")
 
-            merged = dict(defaults_args)
+            merged = dict(updated_defaults)
             merged.update(args_data)
 
             cli_args = []
@@ -883,7 +902,7 @@ class Boxes:
 
             result.append(box)
 
-        return result
+        return result, updated_defaults
 
     def addPart(self, part, name=None):
         """
