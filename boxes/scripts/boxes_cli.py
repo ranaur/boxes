@@ -13,7 +13,7 @@ The commands are:
 
     build [file_or_generator] [--parameters FILE] [generator_args] => create boxes
     list [subcommand] => list different types of information (grnerators, groups, lids, edges ...)
-    parameters [--dir directory] [--all] [--simple|--minimal] [generator ...] => creates parameter files with the default value for generators
+    template [--dir directory] [--all] [--simple|--minimal] [generator ...] => creates parameter files with the default value for generators
     merge => merge multiple boxes into one
     examples [--dir directory] => generate examples in examples folder (default examples/)
 
@@ -339,160 +339,23 @@ def _format_yaml_value(value) -> str:
         return f'"{str(value)}"'
 
 
-def generate_yaml_for_generator(cls, output_dir: str, format_type: str = "full", uncommented: bool = False) -> str | None:
+def generate_yaml_for_generator(cls, output_dir: str, uncommented: bool = False) -> str | None:
     """Generate a YAML file for a single generator.
     
     Args:
         cls: Generator class
         output_dir: Output directory for the file
-        format_type: One of "full", "simple" (just args), or "minimal" (key-value pairs)
         uncommented: If True, output uncommented YAML; otherwise all lines are commented
     """
     gname = cls.__name__
 
     try:
         b = cls()
+        yaml_bytes = b.generateYAML(uncomment_all=uncommented)
 
-        # Collect all parameters from argument groups
-        args_dict = {}
-        for grp in b.argparser._action_groups:
-            # Skip the "optional arguments" group which contains --help etc
-            if grp.title in ['optional arguments', 'options']:
-                continue
-
-            for a in grp._group_actions:
-                if isinstance(a, argparse._HelpAction):
-                    continue
-
-                # Get parameter name (remove leading dashes)
-                param_name = None
-                for flag in getattr(a, 'option_strings', []):
-                    if flag.startswith('--'):
-                        param_name = flag[2:]
-                        break
-                    elif flag.startswith('-') and not flag.startswith('--'):
-                        param_name = flag[1:]
-                        break
-
-                if param_name and param_name != 'help':
-                    # Get default value
-                    default_value = getattr(a, 'default', None)
-                    args_dict[param_name] = default_value
-
-        # Helper function to comment a line unless it's already a comment or uncommented is True
-        def comment_line(line: str) -> str:
-            if uncommented or line.strip().startswith('#') or line.strip() == '':
-                return line
-            leading_spaces = len(line) - len(line.lstrip())
-            return ' ' * leading_spaces + '# ' + line.strip()
-
-        # Valid values for specific parameters
-        VALID_VALUES = {
-            "Lid_style": list(LidSettings.absolute_params["style"]),
-            "Lid_handle": list(LidSettings.absolute_params["handle"]),
-            "FingerJoint_style": list(FingerJointSettings.absolute_params["style"]),
-            "Edge_style": ["too many! Run box_cli list edges to see valid values!"],
-        }
-
-        def get_valid_values_comment(param_name: str) -> str | None:
-            """Return a comment with valid values for specific parameters."""
-            if param_name.endswith("_edge"):
-                param_name = "Edge_style"
-            values = VALID_VALUES.get(param_name)
-            if values:
-                return f"Valid values: {', '.join(values)}"
-            return None
-
-        yaml_lines = []
-        yaml_lines.append("# Generated YAML configuration for " + gname)
-
-        if format_type == "simple":
-            # Simple format: just args section
-            yaml_lines.append("# Simple format (args only)")
-            yaml_lines.append("")
-            yaml_lines.append("args:")
-
-            for param_name, default_value in sorted(args_dict.items()):
-                value_str = _format_yaml_value(default_value)
-                yaml_lines.append(comment_line(f"  {param_name}: {value_str}"))
-
-        elif format_type == "minimal":
-            # Minimal format: just key-value pairs
-            yaml_lines.append("# Minimal format (key-value pairs)")
-            yaml_lines.append("")
-
-            for param_name, default_value in sorted(args_dict.items()):
-                value_str = _format_yaml_value(default_value)
-                yaml_lines.append(comment_line(f"{param_name}: {value_str}"))
-
-        else:  # full format
-            # Full format with Defaults and Boxes sections
-            yaml_lines.append("# Full format with Defaults and Boxes sections")
-            yaml_lines.append("# This file can be used with boxes_generator.py or the build command")
-            yaml_lines.append("")
-            yaml_lines.append("Defaults:")
-            yaml_lines.append(comment_line("    reference: 0"))
-            yaml_lines.append("")
-            yaml_lines.append("Boxes:")
-            yaml_lines.append("  - box_type: " + gname)
-            yaml_lines.append("    name: \"" + gname + "_example\"")
-            yaml_lines.append("    generate: true")
-            yaml_lines.append("    args:")
-
-            # Add parameters grouped by argument groups
-            for group in b.argparser._action_groups[3:] + b.argparser._action_groups[:3]:
-                if not group._group_actions:
-                    continue
-                if len(group._group_actions) == 1 and isinstance(group._group_actions[0], argparse._HelpAction):
-                    continue
-                if group.title in ['optional arguments', 'options']:
-                    continue
-
-                # Add group name as comment
-                yaml_lines.append(f"      ### {group.title}")
-
-                # Process arguments in this group
-                group_args = []
-                for a in group._group_actions:
-                    if isinstance(a, argparse._HelpAction):
-                        continue
-                    if a.dest in ("input", "output"):
-                        continue
-
-                    # Get parameter name (remove leading dashes)
-                    param_name = None
-                    for flag in getattr(a, 'option_strings', []):
-                        if flag.startswith('--'):
-                            param_name = flag[2:]
-                            break
-                        elif flag.startswith('-') and not flag.startswith('--'):
-                            param_name = flag[1:]
-                            break
-
-                    if param_name and param_name != 'help':
-                        default_value = getattr(a, 'default', None)
-                        help_text = getattr(a, 'help', '')
-                        value_str = _format_yaml_value(default_value)
-                        group_args.append((param_name, value_str, help_text))
-
-                # Sort arguments within the group and add them
-                for param_name, value_str, help_text in sorted(group_args):
-                    # Add valid values comment for specific parameters
-                    valid_values = get_valid_values_comment(param_name)
-                    if help_text:
-                        yaml_lines.append(f"      ## {help_text}")
-                    if valid_values:
-                        yaml_lines.append(f"      ## {valid_values}")
-                    yaml_lines.append(comment_line(f"      {param_name}: {value_str}"))
-
-                # Add empty line after each group for readability
-                if group_args:
-                    yaml_lines.append("")
-
-        # Write to file
         filename = os.path.join(output_dir, f"{gname.lower()}.yaml")
-        with open(filename, 'w') as f:
-            f.write('\n'.join(yaml_lines))
+        with open(filename, "wb") as f:
+            f.write(yaml_bytes)
 
         return filename
 
@@ -525,7 +388,7 @@ def cmd_parameters(args) -> None:
                     found = True
                     break
             if not found:
-                logging.warning(f"Warning: Generator '{name}' not found")
+                logging.error(f"Generator '{name}' not found")
 
     generated_files = []
     errors = {}
@@ -543,17 +406,10 @@ def cmd_parameters(args) -> None:
             else:
                 output_dir = base_output_dir
 
-            # Determine format type
-            format_type = "full"
-            if getattr(args, 'simple', False):
-                format_type = "simple"
-            elif getattr(args, 'minimal', False):
-                format_type = "minimal"
-                
-            filename = generate_yaml_for_generator(cls, output_dir, format_type, args.uncommented)
+            filename = generate_yaml_for_generator(cls, output_dir, args.uncommented)
             if filename:
                 generated_files.append(filename)
-                logging.info(f"Created {format_type} config {filename}")
+                logging.info(f"Created config {filename}")
         except Exception as e:
             errors[gname] = repr(e)
             logging.error(f"Error with {gname}: {e}")
@@ -597,7 +453,7 @@ def cmd_merge(args) -> None:
 
 def load_yaml_data(yaml_file: str) -> dict:
     """Load YAML file and return parsed data."""
-    with open(yaml_file) as f:
+    with open(yaml_file, encoding='utf-8') as f:
         return yaml.safe_load(f)
 
 
@@ -1172,27 +1028,16 @@ def main(argv: list[str] | None = None) -> None:
     list_edges_parser = list_subparsers.add_parser("edges", help="List edge types")
     list_edges_parser.add_argument("patterns", type=str, nargs="*", help="Edge character or description patterns (accepts wildcards)")
 
-    # parameters command
-    parameters_parser = subparsers.add_parser("parameters", help="Generate YAML configuration files for generators")
-    parameters_parser.add_argument("--dir", type=str, default=".",
+    # template command
+    template_parser = subparsers.add_parser("template", help="Generate YAML configuration template files for generators")
+    template_parser.add_argument("--dir", type=str, default=".",
                                       help="Output directory for YAML files (default: current dir)")
-    parameters_parser.add_argument("--all", action="store_true", default=False,
+    template_parser.add_argument("--all", action="store_true", default=False,
                                       help="Create config files for all generators")
-    format_group = parameters_parser.add_mutually_exclusive_group()
-    format_group.add_argument("--simple", action="store_true", default=False,
-                              help="Output in simple format (args section only)")
-    format_group.add_argument("--minimal", action="store_true", default=False,
-                              help="Output in minimal format (key-value pairs only)")
-    parameters_parser.add_argument("--uncommented", action="store_true", default=False,
+    template_parser.add_argument("--uncommented", action="store_true", default=False,
                               help="Output uncommented YAML (default is commented)")
-    parameters_parser.add_argument("generators", type=str, nargs="*",
+    template_parser.add_argument("generators", type=str, nargs="*",
                                       help="Generator names to create config for")
-
-    # box_yaml command
-    box_yaml_parser = subparsers.add_parser("box_yaml", help="Create boxes from YAML configuration")
-    box_yaml_parser.add_argument("yaml_file", type=str, help="YAML configuration file")
-    box_yaml_parser.add_argument("--output-dir", type=str, default=".",
-                                 help="Output directory (default: current directory)")
 
     # generate command - create a single box from an exported YAML file
     generate_parser = subparsers.add_parser("generate",
@@ -1227,9 +1072,9 @@ def main(argv: list[str] | None = None) -> None:
             cmd_build(args)
         elif args.command == "list":
             cmd_list(args)
-        elif args.command == "parameters":
+        elif args.command == "template":
             if not args.all and not args.generators:
-                parameters_parser.error("Either provide generator name(s) or use --all flag")
+                template_parser.error("Either provide generator name(s) or use --all flag")
             cmd_parameters(args)
         elif args.command == "merge":
             cmd_merge(args)

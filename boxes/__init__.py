@@ -629,11 +629,15 @@ class Boxes:
         self.metadata["cli"] = self.metadata["cli"].strip()
 
         for arg in args:
+            #print(f"ARG: {arg}")
             key, value= arg.split("=")
             if key.startswith("--"):
                 key = key[2:]
-            # Store original user input values for export functionality
-            self.original_args[key] = value
+            action = self.argparser._option_string_actions.get("--" + key)
+            if action is not None and isinstance(action.type, BoolArg):
+                self.original_args[key] = action.type(value)
+            else:
+                self.original_args[key] = value
 
         # Parse arguments and store original user input values
         parsed_args = vars(self.argparser.parse_args(args=args))
@@ -698,7 +702,6 @@ class Boxes:
                 key = arg_name
                     
                 # Convert the current value to string for consistency
-                print(f"action.type = {action.type}")
                 if isinstance(action.type, BoolArg):
                     defaults[key] = default_value
                 else:
@@ -751,43 +754,139 @@ class Boxes:
         
         return current
 
-    def generateYAML(self):
+    def generateYAML(self, uncomment_all: bool = False):
         # Get current and default parameters
-        current_params = self.getOriginalArgs()
-        default_params = self.getDefaultArgs()
+        # current_params = self.getOriginalArgs()
+        # default_params = self.getDefaultArgs()
 
-        # Generate YAML content
-        yaml_lines = []
-        yaml_lines.append(f"# Exported current parameters for {current_params.get('box_type', 'Unknown')}")
-        yaml_lines.append("# Values same as defaults are commented")
-        yaml_lines.append("")
-        yaml_lines.append("box_type: " + current_params.get("box_type", "Unknown"))
-        yaml_lines.append("name: \"" + current_params.get("name", "example") + "\"")
-        yaml_lines.append("generate: " + current_params.get("generate", "true"))
-        yaml_lines.append("args:")
-
-        def format_value(value):
-            if isinstance(value, bool):
+        def _format_yaml_value(value, value_type = None) -> str:
+            if value_type is None:
+                value_type = type(value)
+            
+            """Format a value for YAML output."""
+            if value_type == None:
+                return "null"
+            elif value_type == bool:
                 return str(value).lower()
-            if isinstance(value, tuple):
-                return ":".join(str(v) for v in value)
-            return str(value)
-        
-        # Sort parameters for consistent output
-        for key in sorted(current_params.keys()):
-            if key in ["box_type", "name", "generate"]:
-                continue  # Already handled above
-            value = current_params[key]
-            default = default_params.get(key, None)
-
-            # Comment if value is same as default
-            if value == default:
-                yaml_lines.append(f"  # {key}: {format_value(value)}")
+            elif value_type == str:
+                return f'"{value}"'
+            elif value_type in (int, float):
+                return str(value)
+            elif value_type == list:
+                return str(value)
             else:
-                yaml_lines.append(f"  {key}: {format_value(value)}")
+                return f'"{str(value)}"'
 
-        yaml_content = "\n".join(yaml_lines)
-        return yaml_content.encode("utf-8")
+        # Helper function to comment a line unless it's already a comment or uncomment_all is True
+        def comment_line(line: str) -> str:
+            if uncomment_all or line.strip().startswith('#') or line.strip() == '':
+                return line
+            leading_spaces = len(line) - len(line.lstrip())
+            return ' ' * leading_spaces + '# ' + line.strip()
+
+        # Valid values for specific parameters
+        from boxes.lids import LidSettings
+        from boxes.edges import FingerJointSettings
+        VALID_VALUES = {
+            "Lid_style": list(LidSettings.absolute_params["style"]),
+            "Lid_handle": list(LidSettings.absolute_params["handle"]),
+            "FingerJoint_style": list(FingerJointSettings.absolute_params["style"]),
+            "Edge_style": ["too many! Run box_cli list edges to see valid values!"],
+        }
+
+        def get_valid_values(param_name: str) -> str | None:
+            if param_name.endswith("_edge"):
+                param_name = "Edge_style"
+            values = VALID_VALUES.get(param_name)
+            if values:
+                return values
+            return None
+
+        yaml_lines = []
+        yaml_lines.append("# Generated YAML configuration for " + self.__class__.__name__)
+
+        # Full format with Defaults and Boxes sections
+        yaml_lines.append("# Full format with Defaults and Boxes sections")
+        yaml_lines.append("# This file can be used with boxes_generator.py or the build command")
+        yaml_lines.append("")
+        yaml_lines.append("Defaults:")
+        yaml_lines.append(comment_line("    reference: 0"))
+        yaml_lines.append("")
+        yaml_lines.append("Boxes:")
+        yaml_lines.append("  - box_type: " + self.__class__.__name__)
+        yaml_lines.append("    name: \"" + self.__class__.__name__ + "_example\"")
+        yaml_lines.append("    generate: true")
+        yaml_lines.append("    args:")
+
+        # Add parameters grouped by argument groups
+        for group in self.argparser._action_groups[3:] + self.argparser._action_groups[:3]:
+            if not group._group_actions:
+                continue
+            if len(group._group_actions) == 1 and isinstance(group._group_actions[0], argparse._HelpAction):
+                continue
+            if group.title in ['optional arguments', 'options']:
+                continue
+
+            # Add group name as comment
+            yaml_lines.append(f"      ### {group.title}")
+
+            # Process arguments in this group
+            group_args = []
+            for a in group._group_actions:
+                if isinstance(a, argparse._HelpAction):
+                    continue
+                if a.dest in ("input", "output"):
+                    continue
+
+                # Get parameter name (remove leading dashes)
+                param_name = None
+                for flag in getattr(a, 'option_strings', []):
+                    if flag.startswith('--'):
+                        param_name = flag[2:]
+                        break
+                    elif flag.startswith('-') and not flag.startswith('--'):
+                        param_name = flag[1:]
+                        break
+
+                if param_name and param_name != 'help':
+                    default_value = getattr(a, 'default', None)
+                    changed = param_name in self.non_default_args
+                    # print((f"{param_name} => default_value = {default_value} // original = {self.original_args.get(param_name, None)}"))
+                    if param_name == "spacing" and "spacing" in self.non_default_args:
+                        # workaround due to spacing parse problem
+                        a = getattr(self, param_name, default_value)
+                        b = self.non_default_args["spacing"][0] * self.thickness + self.non_default_args["spacing"][1] + self.burn * 2
+                        if a == b:
+                            changed = False
+                    # changed = not default_value == self.original_args.get(param_name, None)
+                    if changed:
+                        value_str = self.original_args.get(param_name, default_value)
+                    else: # get from original parameter
+                        value_str = getattr(self, param_name, default_value)
+                    help_text = getattr(a, 'help', '')
+
+                    group_args.append((param_name, value_str, help_text, changed))
+
+            # Sort arguments within the group and add them
+            for param_name, value_str, help_text, changed in sorted(group_args):
+                # Add valid values comment for specific parameters
+                valid_values = get_valid_values(param_name)
+                extra_text = ""
+                if help_text:
+                    extra_text += f" # {help_text}"
+                if valid_values:
+                    extra_text += f" # [{', '.join(valid_values)}]"
+                # print(f"{param_name} => changed = {changed} value = {str(value_str)}({type(value_str).__name__})")
+                if changed:
+                    yaml_lines.append(f"      {param_name}: {_format_yaml_value(value_str, type(default_value))}{extra_text}")
+                else:
+                    yaml_lines.append(comment_line(f"      {param_name}: {_format_yaml_value(value_str, type(default_value))}{extra_text}"))
+
+            # Add empty line after each group for readability
+            if group_args:
+                yaml_lines.append("")
+
+        return "\n".join(yaml_lines).encode("utf-8")
 
     @staticmethod
     def fromYAML(filename: str, translations=None):
