@@ -20,6 +20,10 @@ class SlidingLidBox(Boxes):
         self.addSettingsArgs(edges.FingerJointSettings)
         self.buildArgParser(x=60.0, y=220.0, h=60.0, outside=False)
         self.argparser.add_argument(
+            "--top_edge", action="store",
+            type=ArgparseEdgeType("FhS"), choices=list("FhS"),
+            default="F", help="edge type for top edge")
+        self.argparser.add_argument(
             "--bottom_edge", action="store",
             type=ArgparseEdgeType("Fhs"), choices=list("Fhs"),
             default="F", help="edge type for bottom edge")
@@ -44,6 +48,11 @@ class SlidingLidBox(Boxes):
         self.argparser.add_argument(
             "--hole_radius", action="store", type=float, default=10,
             help="radius of the grip hole in mm")
+        self.argparser.add_argument(
+            "--vertical_edges",  action="store", type=str,
+            default="finger joints",
+            choices=("finger joints", "finger holes"),
+            help="connections used for the vertical edges")
 
     def lowerRailHoles(self):
         # finger holes for bottom rails, subtracting half a thickness so the top sits right at self.h
@@ -76,6 +85,9 @@ class SlidingLidBox(Boxes):
             self.h = self.adjustSize(
                 self.h, e1="F", e2=self.bottom_edge) - gap
 
+        # vertical edges support
+        sideedge = "f" if self.vertical_edges == "finger joints" else "h"
+
         # rail width is a multiple of thickness -> calculate rail width in mm
         self.rail_mm = self.rail * self.thickness
 
@@ -90,10 +102,10 @@ class SlidingLidBox(Boxes):
 
         # side walls
         # compound edge: f on bottom to match with F of front, E to span the gap for the lid
-        sides_compound_edge = edges.CompoundEdge(self, "fE", [self.h, gap])
-        self.rectangularWall(self.y, h_plus, [self.bottom_edge, sides_compound_edge, "F", "f"], callback=[
-                             None, self.lowerRailHoles], move="up mirror", label="right side")
-        self.rectangularWall(self.y, h_plus, [self.bottom_edge, sides_compound_edge, "F", "f"], callback=[
+        sides_compound_edge = edges.CompoundEdge(self, sideedge + "E", [self.h, gap])
+        self.rectangularWall(self.y, h_plus, [self.bottom_edge, sides_compound_edge, self.top_edge, sideedge], callback=[
+                             None, self.lowerRailHoles], move="up", label="right side")
+        self.rectangularWall(self.y, h_plus, [self.bottom_edge, sides_compound_edge, self.top_edge, sideedge], callback=[
                              None, self.lowerRailHoles], move="up", label="left side")
 
         # bottom
@@ -131,18 +143,20 @@ class SlidingLidBox(Boxes):
 
         # move to the right for the rest of the pieces
         self.ctx.restore()
+        spc = 0 if self.vertical_edges == "finger joints" else (self.thickness * self.FingerJoint_edge_width * 2)
+        print(spc)
         self.rectangularWall(self.y, h_plus, "ffff", move="right only")
 
         # back
         # compound edge: top edge in the middle, long edges to cover the ends of the side rails
         back_compound_edge = edges.CompoundEdge(
             self, ["E", "f", "E"], [rail_margin, self.x - 2 * rail_margin, rail_margin])
-        self.rectangularWall(self.x, h_plus, [self.bottom_edge, "F", back_compound_edge, "F"],  callback=[
+        self.rectangularWall(self.x, h_plus, [self.bottom_edge, "f", back_compound_edge, "f"],  callback=[
                              self.backHoles], move="up", label="back")
 
         # front
         # smaller height than the other walls to make space for the sliding lid
-        self.rectangularWall(self.x, self.h, [self.bottom_edge, "F", "e", "F"],
+        self.rectangularWall(self.x, self.h, [self.bottom_edge, "f", "e", "f"],
                              move="up", label="front")
 
         # back rail
