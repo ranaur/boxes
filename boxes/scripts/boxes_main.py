@@ -286,7 +286,8 @@ def main() -> None:
         print_grouped_generators()
     elif args.examples:
         print("Generating SVG examples for every possible generator.")
-        config_path = Path(__file__).parent.parent.parent / 'examples.yml'
+        # frozen apps (e.g. PyInstaller) bundle examples.yml in _MEIPASS
+        config_path = Path(getattr(sys, '_MEIPASS', Path(__file__).parent.parent.parent)) / 'examples.yml'
         output_path = Path("examples")
         multi_generate(config_path, output_path, example_output_fname_formatter)
     elif args.multi_generator:

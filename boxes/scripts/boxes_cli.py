@@ -429,7 +429,8 @@ def cmd_parameters(args) -> None:
 def cmd_examples(args) -> None:
     """Handle examples command"""
     if args.examples:
-        config_files = [Path(__file__).parent.parent.parent / 'examples.yml']
+        # frozen apps (e.g. PyInstaller) bundle examples.yml in _MEIPASS
+        config_files = [Path(getattr(sys, '_MEIPASS', Path(__file__).parent.parent.parent)) / 'examples.yml']
         logging.info("Generating SVG examples from default config.")
     else:
         config_files = [Path(c) for c in args.config]

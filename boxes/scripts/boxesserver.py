@@ -54,12 +54,16 @@ class FileChecker(threading.Thread):
             self._addModules()
 
     def _addModules(self) -> None:
-        for name, module in sys.modules.items():
+        for name, module in list(sys.modules.items()):
             path = getattr(module, "__file__", None)
             if not path:
                 continue
             if path not in self.timestamps:
-                self.timestamps[path] = os.stat(path).st_mtime
+                try:
+                    self.timestamps[path] = os.stat(path).st_mtime
+                except OSError:
+                    # frozen (e.g. PyInstaller) modules have no file on disk
+                    pass
 
     def filesOK(self) -> bool:
         if self.checkmodules:
@@ -143,18 +147,28 @@ class BServer:
             self.staticdir = os.path.join(os.path.dirname(__file__), '../static/')
             if not os.path.isdir(self.staticdir):
                 self.staticdir = os.path.join(os.path.dirname(__file__), '..', '../static/')
+            if not os.path.isdir(self.staticdir):
+                # frozen app (e.g. PyInstaller): data files live in _MEIPASS
+                candidate = os.path.join(getattr(sys, '_MEIPASS', ''), 'static')
+                if os.path.isdir(candidate):
+                    self.staticdir = candidate
         self._languages = None
         self._cache: dict[Any, Any] = {}
         self.url_prefix = url_prefix
         self.static_url = static_url
         self.legal_url = legal_url
 
+    def _localedir(self) -> str:
+        # frozen app (e.g. PyInstaller): locale data lives in _MEIPASS
+        candidate = os.path.join(getattr(sys, '_MEIPASS', ''), 'locale')
+        return candidate if os.path.isdir(candidate) else 'locale'
+
     def getLanguages(self, domain=None, localedir=None):
         if self._languages is not None:
             return self._languages
         self._languages = []
         domain = "boxes.py"
-        for localedir in ["locale", gettext._default_localedir]:
+        for localedir in [self._localedir(), gettext._default_localedir]:
             files = glob.glob(os.path.join(localedir, '*', 'LC_MESSAGES', '%s.mo' % domain))
             self._languages.extend([file.split(os.path.sep)[-3] for file in files])
         self._languages.sort()
@@ -171,7 +185,7 @@ class BServer:
                 break
         if lang:
             try:
-                return gettext.translation('boxes.py', localedir='locale', languages=[lang])
+                return gettext.translation('boxes.py', localedir=self._localedir(), languages=[lang])
             except OSError:
                 pass
             try:
@@ -190,7 +204,7 @@ class BServer:
         langs = [l[1].replace("-", "_") for l in langs]
 
         try:
-            return gettext.translation('boxes.py', localedir='locale', languages=langs)
+            return gettext.translation('boxes.py', localedir=self._localedir(), languages=langs)
         except OSError:
             return gettext.translation('boxes.py', languages=langs, fallback=True)
 
